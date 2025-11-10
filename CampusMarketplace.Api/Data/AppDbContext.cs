@@ -10,40 +10,49 @@ namespace CampusMarketplace.Api.Data;
 /// </summary>
 public class AppDbContext : IdentityDbContext<AppUser>
 {
+    // Constructor: passes DbContext options to the base class
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    // DbSets tell EF Core to create these tables in the database
-    public DbSet<Category> Categories => Set<Category>();
-    public DbSet<Listing> Listings => Set<Listing>();
-    public DbSet<Offer> Offers => Set<Offer>();
-    public DbSet<Order> Orders => Set<Order>();
-    public DbSet<Review> Reviews => Set<Review>();
+    //
+    // --- Tables (DbSets) ---
+    // Each DbSet represents a table in the database
+    //
+    public DbSet<Category> Categories => Set<Category>();  // Stores all categories
+    public DbSet<Listing> Listings => Set<Listing>();      // Stores listings posted by users
+    public DbSet<Offer> Offers => Set<Offer>();            // Stores buyer offers
+    public DbSet<Order> Orders => Set<Order>();            // Stores confirmed purchases
+    public DbSet<Review> Reviews => Set<Review>();         // Stores user reviews after orders
 
+    //
+    // --- Model Configuration ---
+    // Defines how entities relate to each other and handles delete behaviors
+    //
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
-        // Prevent multiple cascade delete issues
+        // Prevent cascade delete conflicts between Listing and Offer
         builder.Entity<Offer>()
             .HasOne(o => o.Listing)
             .WithMany(l => l.Offers)
             .HasForeignKey(o => o.ListingId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Prevent cascade delete conflicts between Listing and Order
         builder.Entity<Order>()
             .HasOne(o => o.Listing)
             .WithMany(l => l.Orders)
             .HasForeignKey(o => o.ListingId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Configure one-to-one between Order and Review
+        // Define one-to-one relationship between Order and Review
         builder.Entity<Order>()
             .HasOne(o => o.Review)
             .WithOne(r => r.Order)
             .HasForeignKey<Review>(r => r.OrderId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Prevent cascade delete loops between reviewers
+        // Prevent cascade delete loops between reviewer and reviewee
         builder.Entity<Review>()
             .HasOne(r => r.Reviewer)
             .WithMany()
@@ -56,5 +65,4 @@ public class AppDbContext : IdentityDbContext<AppUser>
             .HasForeignKey(r => r.RevieweeId)
             .OnDelete(DeleteBehavior.Restrict);
     }
-
 }

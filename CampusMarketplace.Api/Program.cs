@@ -10,53 +10,77 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
 
+//
+// Program.cs — main entry point for the Campus Marketplace API
+//
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Serilog
+//
+// --- Logging Setup ---
+// Configure Serilog for advanced logging using settings from appsettings.json
+//
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
 builder.Host.UseSerilog();
 
-// Db
+//
+// --- Database Configuration ---
+// Connect to SQL Server using the connection string defined in appsettings.json
+//
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("Default"))); // Registers EF Core DbContext
 
-// Identity
+//
+// --- Identity Setup ---
+// Adds ASP.NET Core Identity with support for roles and token providers
+//
 builder.Services.AddIdentity<AppUser, IdentityRole>()
-    .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
+    .AddEntityFrameworkStores<AppDbContext>()  // Use EF Core to store identity data
+    .AddDefaultTokenProviders();                // Enables token-based actions like password reset
 
-// JWT
+//
+// --- JWT Authentication ---
+// Configure JSON Web Token authentication for secure API access
+//
 var jwt = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(opt =>
 {
+    // Set default authentication and challenge schemes to JWT
     opt.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     opt.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(opt =>
 {
+    // Define validation rules for incoming JWT tokens
     opt.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = jwt["Issuer"],
-        ValidAudience = jwt["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!))
+        ValidIssuer = jwt["Issuer"], // The expected issuer (from appsettings)
+        ValidAudience = jwt["Audience"], // The expected audience (from appsettings)
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!)) // Key used to sign the token
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(); // Enables role-based or policy-based authorization
 
-// DI (Repo/UoW)
+//
+// --- Dependency Injection ---
+// Register the UnitOfWork and repositories for database operations
+//
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddControllers();          // Registers controller endpoints
+builder.Services.AddEndpointsApiExplorer(); // Enables minimal API endpoint discovery
 
-// Swagger configuration with JWT support
+//
+// --- Swagger Setup ---
+// Adds Swagger UI for testing the API with JWT authentication support
+//
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -66,16 +90,17 @@ builder.Services.AddSwaggerGen(options =>
         Description = "ASP.NET Core Web API for Campus Marketplace"
     });
 
-    // Enable JWT Auth in Swagger UI
+    // Add JWT authentication option to Swagger UI
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
-        Description = "Please enter JWT token with **Bearer** prefix. Example: `Bearer eyJhbGciOi...`",
+        Description = "Enter JWT token with **Bearer** prefix. Example: `Bearer eyJhbGciOi...`",
         Name = "Authorization",
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
 
+    // Apply the security scheme globally
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -95,21 +120,32 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+//
+// --- Build the App ---
+//
 var app = builder.Build();
 
+//
+// --- Middleware Pipeline ---
+// Only enable Swagger in Development mode
+//
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseSerilogRequestLogging();
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
+app.UseSerilogRequestLogging(); // Logs all HTTP requests
+app.UseHttpsRedirection();      // Redirects HTTP to HTTPS
+app.UseAuthentication();        // Enables JWT authentication middleware
+app.UseAuthorization();         // Checks user permissions
 
-// Seed db + roles/users/data
+app.MapControllers();           // Maps controller routes (e.g., /api/products)
+
+//
+// --- Database Seeding ---
+// Seeds roles, default users, and initial data on startup
+//
 await DbSeeder.SeedAsync(app.Services);
 
-app.Run();
+app.Run(); // Run the web application

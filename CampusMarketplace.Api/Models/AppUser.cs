@@ -7,11 +7,15 @@ namespace CampusMarketplace.Api.Models;
 /// </summary>
 public class AppUser : IdentityUser
 {
-    public string? FirstName { get; set; }
-    public string? LastName { get; set; }
-    public string? ProfilePictureUrl { get; set; }
+    // Basic profile information
+    public string? FirstName { get; set; }         // User's first name
+    public string? LastName { get; set; }          // User's last name
+    public string? ProfilePictureUrl { get; set; } // Link to profile picture
 
-    // Navigation properties (optional)
-    public ICollection<Listing> Listings { get; set; } = new List<Listing>();
-    public ICollection<Review> Reviews { get; set; } = new List<Review>();
+    //
+    // --- Relationships ---
+    // These collections represent related data owned by this user
+    //
+    public ICollection<Listing> Listings { get; set; } = new List<Listing>(); // All listings posted by the user
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();    // All reviews written by the user
 }
